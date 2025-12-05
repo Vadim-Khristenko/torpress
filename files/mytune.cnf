@@ -1,34 +1,40 @@
 [server]
-# this is only for the mysqld standalone daemon
+
 [mysqld]
-collation-server = utf8_general_ci
-character-set-server = utf8
-local-infile=0
-innodb_file_per_table = 1
-symbolic-links=0
-#bind-address = 127.0.0.1
+# Character set configuration
+collation-server = utf8mb4_general_ci
+character-set-server = utf8mb4
+
+# Security settings
+local-infile = 0
+
+# Network settings
 bind-address = 0.0.0.0
-innodb_flush_log_at_trx_commit=2
+
+# InnoDB settings
+innodb_flush_log_at_trx_commit = 2
+innodb_buffer_pool_size = 64M
+innodb_strict_mode = OFF
+transaction-isolation = READ-COMMITTED
+
+# Connection settings
 wait_timeout = 60
 max_allowed_packet = 32M
-# Disabling symbolic-links is recommended to prevent assorted security risks
-query_cache_size = 32M
-query_cache_limit = 32M
+max_connections = 64
 thread_cache_size = 2
-innodb_buffer_pool_size = 32M
-transaction-isolation = READ-COMMITTED
-innodb_flush_method = O_DIRECT
+
+# Memory settings
 tmp_table_size = 64M
 max_heap_table_size = 64M
-table_open_cache = 307200
+table_open_cache = 4096
 key_buffer_size = 64M
 join_buffer_size = 256K
-innodb_buffer_pool_size = 64M
-innodb_strict_mode=off
-sql-mode=""
-max_connections=64
+
+# SQL mode
+sql_mode = ""
 
 [galera]
+
 [embedded]
+
 [mariadb]
-[mariadb-10.2]

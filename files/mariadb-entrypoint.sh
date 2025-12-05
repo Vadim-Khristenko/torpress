@@ -275,7 +275,7 @@ docker_setup_db() {
 			# --skip-write-binlog here is only if Galera is detected
 			# but usefully outputs LOCK TABLES to improve the IO of
 			# Aria (MDEV-23326).
-			mysql_tzinfo_to_sql --skip-write-binlog /usr/share/zoneinfo
+			mariadb-tzinfo-to-sql --skip-write-binlog /usr/share/zoneinfo
 
 			echo "SET SESSION SQL_LOG_BIN=@save_sql_log_bin;"
 		} | docker_process_sql --dont-use-mysql-root-password --database=mysql
@@ -410,7 +410,7 @@ docker_mariadb_upgrade() {
 	docker_mariadb_backup_system
 
 	mysql_note "Starting mariadb-upgrade"
-	mysql_upgrade --upgrade-system-tables
+	mariadb-upgrade --upgrade-system-tables
 	mysql_note "Finished mariadb-upgrade"
 
 	# docker_temp_server_stop needs authentication since
@@ -504,6 +504,27 @@ _main() {
 		#elif mysql_upgrade --check-if-upgrade-is-needed; then
 		elif _check_if_upgrade_is_needed; then
 			docker_mariadb_upgrade "$@"
+		fi
+
+		# If the database already existed, ensure any requested user/database from
+		# environment variables exist (idempotent). This handles the case when a
+		# mounted data directory already exists and the standard init path didn't run
+		# (so MARIADB_USER/MARIADB_DATABASE may not be present).
+		if [ -n "$DATABASE_ALREADY_EXISTS" ] && [ -n "$MARIADB_USER" ]; then
+			mysql_note "Ensuring MariaDB user ${MARIADB_USER} exists (idempotent)"
+			# start a temporary server to perform the user creation
+			docker_temp_server_start "$@"
+			# create user and grant privileges (safe even if database/user already exist)
+			userPasswordEscaped=$( docker_sql_escape_string_literal "${MARIADB_PASSWORD}" )
+			docker_process_sql --database=mysql --binary-mode <<-EOSQL
+				SET @@SESSION.SQL_MODE=REPLACE(@@SESSION.SQL_MODE, 'NO_BACKSLASH_ESCAPES', '');
+				CREATE DATABASE IF NOT EXISTS \\`"${MARIADB_DATABASE}"\\`;
+				CREATE USER IF NOT EXISTS '${MARIADB_USER}'@'%' IDENTIFIED BY '${userPasswordEscaped}';
+				GRANT ALL PRIVILEGES ON \\`${MARIADB_DATABASE//_/\\_}\\`.* TO '${MARIADB_USER}'@'%';
+				FLUSH PRIVILEGES;
+			EOSQL
+			# stop temporary server
+			docker_temp_server_stop
 		fi
 	fi
 	exec "$@"
